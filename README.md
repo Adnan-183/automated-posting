@@ -5,7 +5,8 @@ A FastAPI service with one endpoint, `POST /posting`. It takes a short message w
 - **Stack:** Python 3.10+, FastAPI, Uvicorn, Pydantic v2, HTTPX (async)
 - **Platforms:** Bluesky, Mastodon, Telegram, GitHub Gist, DEV Community, Discord, Rentry, paste.rs (the last two need no account)
 - **Behaviour:** platforms are posted to concurrently and independently, so one failure never blocks the rest
-- **Tests:** 31 pytest tests, with every platform API mocked (no credentials needed)
+- **Public access is verified:** each posted URL is opened anonymously, and `public_access` is `true` only if it really loads
+- **Tests:** 36 pytest tests, with every platform API mocked (no credentials needed)
 
 ---
 
@@ -17,10 +18,11 @@ A FastAPI service with one endpoint, `POST /posting`. It takes a short message w
 4. [Platform research](#platform-research)
 5. [Getting credentials](#getting-credentials)
 6. [How it works](#how-it-works)
-7. [Error handling](#error-handling)
-8. [Tests](#tests)
-9. [Logs and screenshots](#logs-and-screenshots)
-10. [Project structure](#project-structure)
+7. [Public access check](#public-access-check)
+8. [Error handling](#error-handling)
+9. [Tests](#tests)
+10. [Logs and screenshots](#logs-and-screenshots)
+11. [Project structure](#project-structure)
 
 ---
 
@@ -73,7 +75,8 @@ curl -X POST http://localhost:4000/posting \
       "public_access": true,
       "date": "2026-11-16",
       "time": "10:30:00",
-      "error": null
+      "error": null,
+      "note": null
     },
     {
       "platform": "Mastodon",
@@ -82,7 +85,8 @@ curl -X POST http://localhost:4000/posting \
       "public_access": false,
       "date": null,
       "time": null,
-      "error": "HTTP 401: The access token is invalid"
+      "error": "HTTP 401: The access token is invalid",
+      "note": null
     }
   ]
 }
@@ -93,9 +97,10 @@ curl -X POST http://localhost:4000/posting \
 | `platform` | Platform name |
 | `status` | `success` or `failed` |
 | `posted_url` | Link to the published post (`null` on failure, or where no public link exists) |
-| `public_access` | `true` if anyone can open the post without an account or membership |
+| `public_access` | `true` only if the posted URL **actually opened** for an anonymous visitor (see [Public access check](#public-access-check)) |
 | `date` / `time` | When the post was published, in **UTC** (`YYYY-MM-DD`, `HH:MM:SS`) |
 | `error` | Why it failed, taken from the platform's own error message where possible |
+| `note` | Extra detail on a successful post, e.g. `Posted, but the URL returned HTTP 404 for an anonymous visitor.` |
 
 The top-level `success` is `true` when at least one platform succeeded. `summary` gives the counts. The status code is `200` whenever the input is valid, because the per-platform outcome is in the body.
 
@@ -243,6 +248,23 @@ Design decisions:
 
 ---
 
+## Public access check
+
+A platform saying a post is public doesn't mean anyone can see it. I hit this in a live run: GitHub's API returned `"public": true` for a new gist, but the account had been hidden by GitHub's spam filter, so the gist and the profile returned **404** to everyone else.
+
+So after every successful post, the service opens the URL with a separate HTTP client that has no credentials and no cookies, as an anonymous visitor would:
+
+| Outcome | `public_access` | `note` |
+|---|---|---|
+| Page loads (2xx, after redirects) | `true` | `null` |
+| Page returns 4xx/5xx (retried once after 1.5 s, since new pages can take a moment) | `false` | `Posted, but the URL returned HTTP 404 for an anonymous visitor.` |
+| Timeout or network error | `false` | `Posted, but the URL could not be reached (ConnectError) …` |
+| Platform says members only (Discord) or there's no URL (private Telegram channel) | `false` | not checked |
+
+The post's `status` stays `success`, because it was published. The check only answers whether the public can see it. Set `VERIFY_PUBLIC_ACCESS=false` to trust the platform's own answer instead, and the note then says so.
+
+---
+
 ## Error handling
 
 | Situation | Reported `error` |
@@ -264,7 +286,7 @@ Design decisions:
 pytest -q
 ```
 
-The 31 tests use [respx](https://lundberg.github.io/respx/) to mock every platform API, so they run offline in under a second. They cover:
+The 36 tests use [respx](https://lundberg.github.io/respx/) to mock every platform API, so they run offline in under a second. They cover:
 
 - every validation rule, including the 200-character boundary, trailing punctuation, extra fields and malformed JSON
 - all eight platforms succeeding, and the exact URL built for each
@@ -274,6 +296,7 @@ The 31 tests use [respx](https://lundberg.github.io/respx/) to mock every platfo
 - non-JSON responses
 - a private Telegram chat (success with no public URL)
 - a Rentry error status inside an HTTP 200 body, and a truncated paste.rs paste
+- the public access check: hidden pages (404), a page that appears on retry, network errors, members-only posts, and turning the check off
 - the response when no platforms are configured
 - the request payloads sent (auth header, `visibility=public`, `allowed_mentions`, public gist)
 - Bluesky byte-offset facets with emoji, and the DEV title helper
@@ -296,7 +319,7 @@ INFO:     127.0.0.1:50217 - "POST /posting HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50219 - "POST /posting HTTP/1.1" 422 Unprocessable Content
 ```
 
-With credentials set, each successful platform logs a line like `INFO posting: Bluesky: success https://bsky.app/profile/...`.
+With credentials set, each successful platform logs a line like `INFO posting: paste.rs: success https://paste.rs/kHmcO (public: True)`.
 
 Screenshots from a live run are in [`docs/screenshots/`](docs/screenshots/): the Swagger UI, a full response, and the published posts on each platform.
 
