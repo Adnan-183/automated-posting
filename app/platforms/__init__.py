@@ -7,6 +7,8 @@ from app.platforms.devto import DevToPlatform
 from app.platforms.discord import DiscordPlatform
 from app.platforms.github_gist import GitHubGistPlatform
 from app.platforms.mastodon import MastodonPlatform
+from app.platforms.paste_rs import PasteRsPlatform
+from app.platforms.rentry import RentryPlatform
 from app.platforms.telegram import TelegramPlatform
 
 PLATFORM_CLASSES: tuple[type[Platform], ...] = (
@@ -16,6 +18,8 @@ PLATFORM_CLASSES: tuple[type[Platform], ...] = (
     GitHubGistPlatform,
     DevToPlatform,
     DiscordPlatform,
+    RentryPlatform,
+    PasteRsPlatform,
 )
 
 
