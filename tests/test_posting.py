@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from app.platforms.bluesky import link_facet
-from app.platforms.devto import make_title
+from app.platforms.text import make_title
 from tests.conftest import BOT_TOKEN, DISCORD_WEBHOOK
 
 VALID_MESSAGE = (
