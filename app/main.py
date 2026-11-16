@@ -51,7 +51,11 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 
 def get_posting_service(settings: Settings = Depends(get_settings)) -> PostingService:
-    return PostingService(build_platforms(settings), settings.http_timeout_seconds)
+    return PostingService(
+        build_platforms(settings),
+        timeout_seconds=settings.http_timeout_seconds,
+        verify_public_access=settings.verify_public_access,
+    )
 
 
 @app.post(

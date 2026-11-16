@@ -19,6 +19,9 @@ class Settings(BaseSettings):
 
     # General
     http_timeout_seconds: float = 15.0
+    # After posting, open each URL without credentials and report
+    # public_access=true only if it actually loads.
+    verify_public_access: bool = True
 
     # Bluesky (AT Protocol) - https://docs.bsky.app/docs/get-started
     bluesky_handle: str | None = None

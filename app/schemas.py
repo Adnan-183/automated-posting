@@ -69,6 +69,9 @@ class PlatformResult(BaseModel):
     date: str | None = Field(None, description="Posting date (UTC), YYYY-MM-DD.")
     time: str | None = Field(None, description="Posting time (UTC), HH:MM:SS.")
     error: str | None = None
+    note: str | None = Field(
+        None, description="Extra detail on a successful post, e.g. why it is not publicly accessible."
+    )
 
 
 class Summary(BaseModel):
