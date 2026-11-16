@@ -77,5 +77,25 @@ def mock_platforms():
             },
         )
         router.post("https://paste.rs/").respond(201, text="https://paste.rs/Xy12z")
+
+        # Anonymous public-access checks: every posted URL opens.
+        for url in PUBLIC_URLS:
+            router.get(url).respond(200, text="<html>post</html>")
         yield router
+
+
+@pytest.fixture(autouse=True)
+def no_retry_delay(monkeypatch):
+    monkeypatch.setattr("app.services.posting_service.PUBLIC_CHECK_RETRY_DELAY_SECONDS", 0)
+
+
+PUBLIC_URLS = (
+    "https://bsky.app/profile/tester.bsky.social/post/3kpost",
+    "https://mastodon.example/@tester/1",
+    "https://t.me/test_channel/42",
+    "https://gist.github.com/tester/abc",
+    "https://dev.to/tester/check-out-1abc",
+    "https://rentry.co/abc123",
+    "https://paste.rs/Xy12z",
+)
 

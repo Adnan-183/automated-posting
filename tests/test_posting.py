@@ -134,6 +134,7 @@ def test_one_failure_does_not_stop_the_others(client, mock_platforms):
         "date": None,
         "time": None,
         "error": "HTTP 401: The access token is invalid",
+        "note": None,
     }
 
 
@@ -238,6 +239,76 @@ def test_paste_rs_truncated_paste_is_a_failure(client, mock_platforms):
     paste = results_by_platform(client.post("/posting", json={"message": VALID_MESSAGE}))["paste.rs"]
     assert paste["status"] == "failed"
     assert paste["error"] == "Paste was truncated by the size limit."
+
+
+# --- Public access check ---------------------------------------------------
+
+
+def test_public_access_is_false_when_the_page_is_hidden(client, mock_platforms):
+    # e.g. a flagged GitHub account: the API says public, visitors get 404.
+    mock_platforms.get("https://gist.github.com/tester/abc").respond(404)
+
+    gist = results_by_platform(client.post("/posting", json={"message": VALID_MESSAGE}))["GitHub Gist"]
+
+    assert gist["status"] == "success"
+    assert gist["posted_url"] == "https://gist.github.com/tester/abc"
+    assert gist["public_access"] is False
+    assert gist["note"] == "Posted, but the URL returned HTTP 404 for an anonymous visitor."
+
+
+def test_public_check_retries_a_page_that_is_not_live_yet(client, mock_platforms):
+    route = mock_platforms.get("https://dev.to/tester/check-out-1abc")
+    route.side_effect = [httpx.Response(404), httpx.Response(200)]
+
+    devto = results_by_platform(client.post("/posting", json={"message": VALID_MESSAGE}))["DEV Community"]
+
+    assert devto["public_access"] is True
+    assert devto["note"] is None
+    assert route.call_count == 2
+
+
+def test_public_check_network_error_is_reported(client, mock_platforms):
+    mock_platforms.get("https://paste.rs/Xy12z").mock(side_effect=httpx.ConnectError("down"))
+
+    paste = results_by_platform(client.post("/posting", json={"message": VALID_MESSAGE}))["paste.rs"]
+
+    assert paste["status"] == "success"
+    assert paste["public_access"] is False
+    assert paste["note"] == (
+        "Posted, but the URL could not be reached (ConnectError) for an anonymous visitor."
+    )
+
+
+def test_public_check_can_be_turned_off(mock_platforms):
+    from fastapi.testclient import TestClient
+
+    from app.config import get_settings
+    from app.main import app
+    from tests.conftest import configured_settings
+
+    def settings_without_check():
+        settings = configured_settings()
+        settings.verify_public_access = False
+        return settings
+
+    app.dependency_overrides[get_settings] = settings_without_check
+    try:
+        response = TestClient(app).post("/posting", json={"message": VALID_MESSAGE})
+    finally:
+        app.dependency_overrides.clear()
+
+    gist = results_by_platform(response)["GitHub Gist"]
+    assert gist["public_access"] is True
+    assert gist["note"] == "Public access reported by the platform, not checked."
+    assert not mock_platforms.get("https://gist.github.com/tester/abc").called
+
+
+def test_members_only_posts_are_not_checked(client, mock_platforms):
+    client.post("/posting", json={"message": VALID_MESSAGE})
+    # Discord reports public_access=False itself, so no anonymous GET is made
+    # for its URL (an unmocked request would fail the test).
+    discord = [c for c in mock_platforms.calls if "discord.com/channels" in str(c.request.url)]
+    assert discord == []
 
 
 # --- Platform helpers -------------------------------------------------------
