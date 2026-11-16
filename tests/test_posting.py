@@ -93,7 +93,7 @@ def test_posts_to_every_platform(client, mock_platforms):
     assert response.status_code == 200
     body = response.json()
     assert body["success"] is True
-    assert body["summary"] == {"total": 6, "succeeded": 6, "failed": 0}
+    assert body["summary"] == {"total": 8, "succeeded": 8, "failed": 0}
 
     results = results_by_platform(response)
     assert results["Bluesky"]["posted_url"] == "https://bsky.app/profile/tester.bsky.social/post/3kpost"
@@ -102,9 +102,11 @@ def test_posts_to_every_platform(client, mock_platforms):
     assert results["GitHub Gist"]["posted_url"] == "https://gist.github.com/tester/abc"
     assert results["DEV Community"]["posted_url"] == "https://dev.to/tester/check-out-1abc"
     assert results["Discord"]["posted_url"] == "https://discord.com/channels/333/222/999"
+    assert results["Rentry"]["posted_url"] == "https://rentry.co/abc123"
+    assert results["paste.rs"]["posted_url"] == "https://paste.rs/Xy12z"
 
     assert results["Discord"]["public_access"] is False
-    for name in ("Bluesky", "Mastodon", "Telegram", "GitHub Gist", "DEV Community"):
+    for name in ("Bluesky", "Mastodon", "Telegram", "GitHub Gist", "DEV Community", "Rentry", "paste.rs"):
         assert results[name]["public_access"] is True
 
     for result in body["results"]:
@@ -122,7 +124,7 @@ def test_one_failure_does_not_stop_the_others(client, mock_platforms):
 
     body = response.json()
     assert body["success"] is True
-    assert body["summary"] == {"total": 6, "succeeded": 5, "failed": 1}
+    assert body["summary"] == {"total": 8, "succeeded": 7, "failed": 1}
     mastodon = results_by_platform(response)["Mastodon"]
     assert mastodon == {
         "platform": "Mastodon",
@@ -179,13 +181,17 @@ def test_private_telegram_chat_has_no_public_url(client, mock_platforms):
     assert telegram["public_access"] is False
 
 
-def test_unconfigured_platforms_fail_with_a_clear_message(unconfigured_client):
+def test_unconfigured_platforms_fail_with_a_clear_message(unconfigured_client, mock_platforms):
     response = unconfigured_client.post("/posting", json={"message": VALID_MESSAGE})
 
     body = response.json()
     assert response.status_code == 200
-    assert body["success"] is False
-    assert body["summary"] == {"total": 6, "succeeded": 0, "failed": 6}
+    # Only the two no-account platforms can post without credentials.
+    assert body["success"] is True
+    assert body["summary"] == {"total": 8, "succeeded": 2, "failed": 6}
+    results = results_by_platform(response)
+    assert results["Rentry"]["status"] == "success"
+    assert results["paste.rs"]["status"] == "success"
     assert results_by_platform(response)["Mastodon"]["error"] == (
         "Not configured: set MASTODON_INSTANCE_URL, MASTODON_ACCESS_TOKEN."
     )
@@ -205,13 +211,45 @@ def test_requests_send_the_expected_payloads(client, mock_platforms):
     assert gist["public"] is True
 
 
+def test_rentry_error_status_inside_http_200_is_a_failure(client, mock_platforms):
+    # Rentry always answers HTTP 200; the real status is in the body.
+    mock_platforms.post("https://rentry.co/api/new").respond(
+        200, json={"status": "429", "content": "Rate limited, slow down."}
+    )
+    rentry = results_by_platform(client.post("/posting", json={"message": VALID_MESSAGE}))["Rentry"]
+    assert rentry["status"] == "failed"
+    assert rentry["error"] == "Rentry status 429: Rate limited, slow down."
+
+
+def test_rentry_page_gets_a_title_and_markdown_link(client, mock_platforms):
+    client.post("/posting", json={"message": VALID_MESSAGE})
+    request = mock_platforms.routes[8].calls.last.request
+    sent = dict(httpx.QueryParams(request.content.decode()))
+    assert sent["text"].endswith("[https://example.com](https://example.com)")
+    assert sent["metadata"].startswith("PAGE_TITLE = Check out our latest business platform")
+    assert "edit_code" not in sent
+
+
+def test_paste_rs_truncated_paste_is_a_failure(client, mock_platforms):
+    mock_platforms.post("https://paste.rs/").respond(206, text="https://paste.rs/Cut01")
+    paste = results_by_platform(client.post("/posting", json={"message": VALID_MESSAGE}))["paste.rs"]
+    assert paste["status"] == "failed"
+    assert paste["error"] == "Paste was truncated by the size limit."
+
+
 # --- Platform helpers -------------------------------------------------------
 
 
 def test_platforms_endpoint_lists_configuration(unconfigured_client):
-    statuses = unconfigured_client.get("/platforms").json()
-    assert len(statuses) == 6
-    assert all(status["configured"] is False for status in statuses)
+    statuses = {s["platform"]: s for s in unconfigured_client.get("/platforms").json()}
+    assert len(statuses) == 8
+    assert statuses["Rentry"]["configured"] is True
+    assert statuses["paste.rs"]["configured"] is True
+    assert statuses["GitHub Gist"] == {
+        "platform": "GitHub Gist",
+        "configured": False,
+        "missing_env_vars": ["GITHUB_TOKEN"],
+    }
 
 
 def test_bluesky_link_facet_uses_byte_offsets():

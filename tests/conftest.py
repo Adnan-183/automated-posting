@@ -66,5 +66,16 @@ def mock_platforms():
         )
         router.post(DISCORD_WEBHOOK).respond(200, json={"id": "999", "channel_id": "222"})
         router.get(DISCORD_WEBHOOK).respond(200, json={"guild_id": "333"})
+        router.post("https://rentry.co/api/new").respond(
+            200,
+            json={
+                "status": "200",
+                "content": "OK",
+                "url": "https://rentry.co/abc123",
+                "url_short": "abc123",
+                "edit_code": "generated-code",
+            },
+        )
+        router.post("https://paste.rs/").respond(201, text="https://paste.rs/Xy12z")
         yield router
 
