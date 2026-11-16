@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Discord webhooks - https://discord.com/developers/docs/resources/webhook#execute-webhook
     discord_webhook_url: str | None = None
 
+    # Rentry - https://github.com/radude/rentry#usage-api (no account needed)
+    rentry_edit_code: str | None = None  # optional: lets you edit/delete pages later
+
 
 @lru_cache
 def get_settings() -> Settings:
