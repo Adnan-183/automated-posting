@@ -8,7 +8,7 @@ import logging
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
@@ -79,6 +79,11 @@ async def list_platforms(settings: Settings = Depends(get_settings)) -> list[Pla
             PlatformStatus(platform=platform.name, configured=not missing, missing_env_vars=missing)
         )
     return statuses
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health", summary="Health check")
