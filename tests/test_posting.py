@@ -226,7 +226,10 @@ def test_rentry_page_gets_a_title_and_markdown_link(client, mock_platforms):
     request = mock_platforms.routes[8].calls.last.request
     sent = dict(httpx.QueryParams(request.content.decode()))
     assert sent["text"].endswith("[https://example.com](https://example.com)")
-    assert sent["metadata"].startswith("PAGE_TITLE = Check out our latest business platform")
+    title = sent["metadata"].removeprefix("PAGE_TITLE = ")
+    # Rentry rejects titles over 60 characters (found in a live run).
+    assert len(title) <= 60
+    assert title.startswith("Check out our latest business platform")
     assert "edit_code" not in sent
 
 

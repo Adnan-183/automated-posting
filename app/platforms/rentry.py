@@ -12,6 +12,10 @@ from app.platforms.base import Platform, PlatformError, PublishedPost, raise_for
 from app.platforms.text import make_title, markdown_link
 
 
+# Rentry rejects a PAGE_TITLE longer than 60 characters.
+MAX_PAGE_TITLE_LENGTH = 60
+
+
 class RentryPlatform(Platform):
     name = "Rentry"
     required_settings = ()
@@ -19,7 +23,7 @@ class RentryPlatform(Platform):
     async def publish(self, message: str, cta_url: str, client: httpx.AsyncClient) -> PublishedPost:
         data = {
             "text": markdown_link(message, cta_url),
-            "metadata": f"PAGE_TITLE = {make_title(message, cta_url)}",
+            "metadata": f"PAGE_TITLE = {make_title(message, cta_url, MAX_PAGE_TITLE_LENGTH)}",
         }
         # A fixed edit code lets you edit or delete the pages later on rentry.co.
         # Without one, Rentry generates a random code per page.
