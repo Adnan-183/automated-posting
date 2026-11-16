@@ -1,11 +1,11 @@
 # Automated Multi-Platform Posting System
 
-A FastAPI service with one endpoint, `POST /posting`. It takes a short message with one call-to-action link and publishes it to six third-party platforms through their official APIs. It returns a result for every platform: the posted URL, whether the post is publicly accessible, and when it was posted or why it failed.
+A FastAPI service with one endpoint, `POST /posting`. It takes a short message with one call-to-action link and publishes it to eight third-party platforms through their official APIs. It returns a result for every platform: the posted URL, whether the post is publicly accessible, and when it was posted or why it failed.
 
 - **Stack:** Python 3.10+, FastAPI, Uvicorn, Pydantic v2, HTTPX (async)
-- **Platforms:** Bluesky, Mastodon, Telegram, GitHub Gist, DEV Community, Discord
+- **Platforms:** Bluesky, Mastodon, Telegram, GitHub Gist, DEV Community, Discord, Rentry, paste.rs (the last two need no account)
 - **Behaviour:** platforms are posted to concurrently and independently, so one failure never blocks the rest
-- **Tests:** 28 pytest tests, with every platform API mocked (no credentials needed)
+- **Tests:** 31 pytest tests, with every platform API mocked (no credentials needed)
 
 ---
 
@@ -57,14 +57,14 @@ curl -X POST http://localhost:4000/posting \
   -d '{"message": "Check out our latest business platform and grow your online visibility. https://example.com"}'
 ```
 
-**Response `200`** (with all six platforms configured)
+**Response `200`** (results trimmed to two platforms)
 
 ```json
 {
   "success": true,
   "message": "Check out our latest business platform and grow your online visibility. https://example.com",
   "cta_url": "https://example.com",
-  "summary": { "total": 6, "succeeded": 5, "failed": 1 },
+  "summary": { "total": 8, "succeeded": 7, "failed": 1 },
   "results": [
     {
       "platform": "Bluesky",
@@ -147,7 +147,7 @@ Notes:
 
 ### Chosen platforms
 
-I chose these six because each has an official, documented, free write API that an individual developer can use without a partner or app review, and five of them return a public URL for the post.
+I chose these eight because each has an official, documented, free write API that an individual developer can use without a partner or app review. Seven of them return a public URL for the post. Two (Rentry and paste.rs) need no account at all, so the service publishes somewhere even with an empty `.env`.
 
 | Platform | API used | Auth | Public URL | Docs |
 |---|---|---|---|---|
@@ -157,12 +157,16 @@ I chose these six because each has an official, documented, free write API that 
 | **GitHub Gist** | `POST /gists` (public gist) | Personal access token | ✅ gist `html_url` | [Create a gist](https://docs.github.com/en/rest/gists/gists#create-a-gist) |
 | **DEV Community** | Forem `POST /api/articles` (published) | `api-key` header | ✅ article `url` | [Forem API](https://developers.forem.com/api/v1#tag/articles) |
 | **Discord** | Execute webhook with `?wait=true` | Webhook URL | ⚠️ link only works for server members, so `public_access: false` | [Execute webhook](https://discord.com/developers/docs/resources/webhook#execute-webhook) |
+| **Rentry** | `POST /api/new` (markdown page, CSRF-exempt) | None (optional fixed edit code) | ✅ `rentry.co/<id>` | [Rentry API](https://github.com/radude/rentry#usage-api) |
+| **paste.rs** | `POST /` with the raw text | None | ✅ `paste.rs/<id>` | [paste.rs](https://paste.rs/web) |
 
 Platform-specific details handled:
 - **Bluesky:** a plain-text URL is not clickable. The code adds a *link facet*, which needs **UTF-8 byte offsets**, not character offsets, so messages with emoji still link correctly (there's a test for this).
 - **Mastodon:** sends an `Idempotency-Key`, so a retried request can't create a duplicate post.
 - **Telegram:** a private channel has no public link, so the post is reported as `success` with `posted_url: null` and `public_access: false`.
 - **DEV Community:** articles need a title, so the first sentence of the message is used, without the link, capped at 80 characters.
+- **Rentry:** always answers HTTP 200 and puts the real status (`200`, `400`, `429`, …) in the JSON body, so the code checks the body, not the HTTP code. The page gets a `PAGE_TITLE` and a markdown link.
+- **paste.rs:** `201` means the paste was stored in full and `206` means it was cut short by the size limit, which is reported as a failure.
 - **Discord:** `allowed_mentions: {"parse": []}` stops a message from pinging `@everyone`. The execute response has no guild id, so it's read from the webhook to build the message link.
 
 ### Considered and not used
@@ -173,6 +177,8 @@ Platform-specific details handled:
 | LinkedIn | Posting needs an approved app with the "Share on LinkedIn" / Community Management product |
 | Facebook Pages / Instagram | Needs a Meta app, a business account and app review for publishing permissions |
 | Reddit | New API apps need approval, and many subreddits block automated link posts |
+| Telegraph (telegra.ph) | Good no-account API, but unreachable from my network (the host times out), so it couldn't be verified live |
+| dpaste.org | The API answered with a bot-protection "Security Check" page (HTTP 403) instead of JSON |
 | LLM platforms (OpenAI, Anthropic, etc.) | Their APIs generate text but don't host public posts, so there's nothing to publish to or link to |
 
 ### Adding a platform
@@ -197,6 +203,9 @@ Each one takes about five minutes. Put the values in `.env`, which is git-ignore
 | **GitHub Gist** | Settings → Developer settings → Personal access tokens → **Fine-grained** → Account permissions → *Gists: Read and write*. Set `GITHUB_TOKEN`. |
 | **DEV Community** | dev.to → Settings → Extensions → **DEV Community API Keys** → Generate. Set `DEVTO_API_KEY`. |
 | **Discord** | Server Settings → Integrations → **Webhooks** → New Webhook → pick a channel → Copy Webhook URL. Set `DISCORD_WEBHOOK_URL`. |
+| **Rentry / paste.rs** | Nothing to set up. Optionally set `RENTRY_EDIT_CODE` so you can edit or delete Rentry pages later. |
+
+> **Network note:** Telegram (`api.telegram.org`) is blocked by some ISPs. If it times out for you, the Telegram result shows `Request timed out` and every other platform still posts.
 
 ---
 
@@ -217,14 +226,16 @@ PostingService.publish()
    ├──► Telegram.publish()      │   - missing credentials → failed
    ├──► GitHubGist.publish()    │   - exceptions caught per platform
    ├──► DevTo.publish()         │   - success → URL + UTC timestamp
-   └──► Discord.publish()      ─┘
+   ├──► Discord.publish()       │
+   ├──► Rentry.publish()        │
+   └──► PasteRs.publish()      ─┘
    │
    ▼
 PostingResponse {success, message, cta_url, summary, results[]}
 ```
 
 Design decisions:
-- **Concurrent.** The total time is roughly the slowest platform, not the sum of all six.
+- **Concurrent.** The total time is roughly the slowest platform, not the sum of all eight.
 - **Isolated failures.** Each platform's call is wrapped on its own, so an exception, timeout or bad response affects only that platform's result.
 - **Platform registry.** Selection is internal (`PLATFORM_CLASSES`), and the request model rejects any attempt to choose platforms.
 - **Dependency injection.** Settings and the service are FastAPI dependencies, so tests override them without patching globals.
@@ -253,15 +264,16 @@ Design decisions:
 pytest -q
 ```
 
-The 28 tests use [respx](https://lundberg.github.io/respx/) to mock every platform API, so they run offline in under a second. They cover:
+The 31 tests use [respx](https://lundberg.github.io/respx/) to mock every platform API, so they run offline in under a second. They cover:
 
 - every validation rule, including the 200-character boundary, trailing punctuation, extra fields and malformed JSON
-- all six platforms succeeding, and the exact URL built for each
+- all eight platforms succeeding, and the exact URL built for each
 - one platform failing while the rest still post
 - timeouts and network errors
 - secrets never appearing in error messages
 - non-JSON responses
 - a private Telegram chat (success with no public URL)
+- a Rentry error status inside an HTTP 200 body, and a truncated paste.rs paste
 - the response when no platforms are configured
 - the request payloads sent (auth header, `visibility=public`, `allowed_mentions`, public gist)
 - Bluesky byte-offset facets with emoji, and the DEV title helper
@@ -307,7 +319,10 @@ automated-posting/
 │   │   ├── telegram.py
 │   │   ├── github_gist.py
 │   │   ├── devto.py
-│   │   └── discord.py
+│   │   ├── discord.py
+│   │   ├── rentry.py
+│   │   ├── paste_rs.py
+│   │   └── text.py              # Shared title / markdown-link helpers
 │   └── services/
 │       └── posting_service.py   # Concurrent, failure-isolated publishing
 ├── tests/
