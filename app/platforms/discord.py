@@ -1,10 +1,4 @@
-"""Discord channel, through an incoming webhook.
-
-Docs: https://discord.com/developers/docs/resources/webhook#execute-webhook
-`?wait=true` makes Discord return the created message, so we can build its
-link. Discord messages are only visible to server members, so
-`public_access` is always False.
-"""
+"""Discord webhook. Docs: https://discord.com/developers/docs/resources/webhook#execute-webhook"""
 
 import httpx
 
@@ -20,7 +14,6 @@ class DiscordPlatform(Platform):
         response = await client.post(
             webhook_url,
             params={"wait": "true"},
-            # Never let the message ping @everyone, @here, users or roles.
             json={"content": message, "allowed_mentions": {"parse": []}},
         )
         raise_for_api_error(response)
@@ -29,7 +22,6 @@ class DiscordPlatform(Platform):
         if not posted.get("id"):
             raise PlatformError("Message sent but Discord returned no message id.")
 
-        # The execute response has no guild id; the webhook itself does.
         webhook_response = await client.get(webhook_url)
         guild_id = webhook_response.json().get("guild_id") if webhook_response.is_success else None
         url = (

@@ -13,8 +13,6 @@ EXAMPLE_MESSAGE = (
 
 
 class PostRequest(BaseModel):
-    # Extra fields are rejected: the caller cannot choose platforms,
-    # platform selection is handled by the application.
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={"examples": [{"message": EXAMPLE_MESSAGE}]},

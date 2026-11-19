@@ -1,10 +1,4 @@
-"""paste.rs, a public pastebin, through its HTTP API.
-
-Docs: https://paste.rs/web (API: POST the raw text to https://paste.rs/)
-No account needed. The response body is the paste URL as plain text:
-201 means the paste was stored in full, 206 means it was cut short by the
-size limit, which is treated as a failure here.
-"""
+"""paste.rs pastebin, no account needed. Docs: https://paste.rs/web"""
 
 import httpx
 

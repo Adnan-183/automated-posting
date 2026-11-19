@@ -78,7 +78,6 @@ def mock_platforms():
         )
         router.post("https://paste.rs/").respond(201, text="https://paste.rs/Xy12z")
 
-        # Anonymous public-access checks: every posted URL opens.
         for url in PUBLIC_URLS:
             router.get(url).respond(200, text="<html>post</html>")
         yield router

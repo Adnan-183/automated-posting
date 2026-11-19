@@ -16,9 +16,6 @@ def results_by_platform(response) -> dict:
     return {result["platform"]: result for result in response.json()["results"]}
 
 
-# --- Input validation -------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("message", "expected_error"),
     [
@@ -82,9 +79,6 @@ def test_trailing_punctuation_is_not_part_of_the_link(client, mock_platforms):
     response = client.post("/posting", json={"message": "Read more at https://example.com/blog."})
     assert response.status_code == 200
     assert response.json()["cta_url"] == "https://example.com/blog"
-
-
-# --- Posting ----------------------------------------------------------------
 
 
 def test_posts_to_every_platform(client, mock_platforms):
@@ -187,7 +181,6 @@ def test_unconfigured_platforms_fail_with_a_clear_message(unconfigured_client, m
 
     body = response.json()
     assert response.status_code == 200
-    # Only the two no-account platforms can post without credentials.
     assert body["success"] is True
     assert body["summary"] == {"total": 8, "succeeded": 2, "failed": 6}
     results = results_by_platform(response)
@@ -213,7 +206,6 @@ def test_requests_send_the_expected_payloads(client, mock_platforms):
 
 
 def test_rentry_error_status_inside_http_200_is_a_failure(client, mock_platforms):
-    # Rentry always answers HTTP 200; the real status is in the body.
     mock_platforms.post("https://rentry.co/api/new").respond(
         200, json={"status": "429", "content": "Rate limited, slow down."}
     )
@@ -228,7 +220,6 @@ def test_rentry_page_gets_a_title_and_markdown_link(client, mock_platforms):
     sent = dict(httpx.QueryParams(request.content.decode()))
     assert sent["text"].endswith("[https://example.com](https://example.com)")
     title = sent["metadata"].removeprefix("PAGE_TITLE = ")
-    # Rentry rejects titles over 60 characters (found in a live run).
     assert len(title) <= 60
     assert title.startswith("Check out our latest business platform")
     assert "edit_code" not in sent
@@ -241,11 +232,7 @@ def test_paste_rs_truncated_paste_is_a_failure(client, mock_platforms):
     assert paste["error"] == "Paste was truncated by the size limit."
 
 
-# --- Public access check ---------------------------------------------------
-
-
 def test_public_access_is_false_when_the_page_is_hidden(client, mock_platforms):
-    # e.g. a flagged GitHub account: the API says public, visitors get 404.
     mock_platforms.get("https://gist.github.com/tester/abc").respond(404)
 
     gist = results_by_platform(client.post("/posting", json={"message": VALID_MESSAGE}))["GitHub Gist"]
@@ -305,13 +292,8 @@ def test_public_check_can_be_turned_off(mock_platforms):
 
 def test_members_only_posts_are_not_checked(client, mock_platforms):
     client.post("/posting", json={"message": VALID_MESSAGE})
-    # Discord reports public_access=False itself, so no anonymous GET is made
-    # for its URL (an unmocked request would fail the test).
     discord = [c for c in mock_platforms.calls if "discord.com/channels" in str(c.request.url)]
     assert discord == []
-
-
-# --- Platform helpers -------------------------------------------------------
 
 
 def test_platforms_endpoint_lists_configuration(unconfigured_client):

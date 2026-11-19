@@ -13,8 +13,6 @@ logger = logging.getLogger("posting")
 
 USER_AGENT = "automated-posting/1.0 (+https://github.com)"
 
-# A freshly published page can take a moment to appear, so a failed public
-# check is retried once after a short pause before it is reported.
 PUBLIC_CHECK_ATTEMPTS = 2
 PUBLIC_CHECK_RETRY_DELAY_SECONDS = 1.5
 
@@ -36,16 +34,12 @@ class PostingService:
                 timeout=self.timeout_seconds,
                 headers={"User-Agent": USER_AGENT},
             ) as client,
-            # Separate client for public checks: no credentials, no cookies,
-            # follows redirects - it sees what an anonymous visitor sees.
             httpx.AsyncClient(
                 timeout=self.timeout_seconds,
                 headers={"User-Agent": USER_AGENT},
                 follow_redirects=True,
             ) as anonymous_client,
         ):
-            # Each platform runs in its own task and catches its own errors,
-            # so one failure never stops the others.
             results = await asyncio.gather(
                 *(
                     self._publish_one(platform, message, cta_url, client, anonymous_client)
@@ -81,11 +75,10 @@ class PostingService:
         except httpx.TimeoutException:
             return self._failed(platform, f"Request timed out after {self.timeout_seconds:g}s.")
         except httpx.RequestError as exc:
-            # Only the exception type: its text can include a URL holding a token.
             return self._failed(platform, f"Network error ({type(exc).__name__}).")
         except (KeyError, TypeError, ValueError):
             return self._failed(platform, "Unexpected response format from the platform API.")
-        except Exception as exc:  # noqa: BLE001 - one platform must never break the rest
+        except Exception as exc:
             logger.exception("%s: unexpected error", platform.name)
             return self._failed(platform, f"Unexpected error ({type(exc).__name__}).")
 
@@ -112,12 +105,7 @@ class PostingService:
     async def _check_public_access(
         self, post: PublishedPost, anonymous_client: httpx.AsyncClient
     ) -> tuple[bool, str | None]:
-        """Confirm the post opens for an anonymous visitor.
-
-        The platform's own claim is only the starting point: a platform can
-        report a post as public while the account is hidden or the page is
-        not live yet. Only a successful anonymous GET counts as public.
-        """
+        """Return whether the URL opens for an anonymous visitor, with a note if not."""
         if not post.url or not post.public_access:
             return False, None
         if not self.verify_public_access:

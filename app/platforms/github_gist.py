@@ -1,9 +1,4 @@
-"""GitHub Gists, through the REST API.
-
-Docs: https://docs.github.com/en/rest/gists/gists#create-a-gist
-Token needed: a fine-grained token with "Gists: read and write",
-or a classic token with the `gist` scope.
-"""
+"""GitHub Gists. Docs: https://docs.github.com/en/rest/gists/gists#create-a-gist"""
 
 import httpx
 

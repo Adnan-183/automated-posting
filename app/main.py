@@ -1,8 +1,4 @@
-"""FastAPI entry point.
-
-Run with:
-    uvicorn app.main:app --host 0.0.0.0 --port 4000
-"""
+"""FastAPI app: uvicorn app.main:app --host 0.0.0.0 --port 4000"""
 
 import logging
 
@@ -25,7 +21,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
 )
-# httpx logs every request URL at INFO; the Telegram URL contains the bot token.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 

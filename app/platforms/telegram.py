@@ -1,9 +1,4 @@
-"""Telegram channel, through the Bot API.
-
-Docs: https://core.telegram.org/bots/api#sendmessage
-The bot must be an administrator of the channel. A channel with a public
-@username gets a public t.me link; a private one gets no public URL.
-"""
+"""Telegram channel via Bot API. Docs: https://core.telegram.org/bots/api#sendmessage"""
 
 import httpx
 
@@ -28,6 +23,5 @@ class TelegramPlatform(Platform):
         result = body["result"]
         username = result.get("chat", {}).get("username")
         if not username:
-            # Private channel or group: the message exists but has no public link.
             return PublishedPost(url=None, public_access=False)
         return PublishedPost(url=f"https://t.me/{username}/{result['message_id']}", public_access=True)

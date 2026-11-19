@@ -1,10 +1,4 @@
-"""Bluesky, through the AT Protocol XRPC API.
-
-Docs:
-- Create a session: https://docs.bsky.app/docs/api/com-atproto-server-create-session
-- Create a post:    https://docs.bsky.app/docs/advanced-guides/posts
-- Link facets:      https://docs.bsky.app/docs/advanced-guides/post-richtext
-"""
+"""Bluesky (AT Protocol). Docs: https://docs.bsky.app/docs/advanced-guides/posts"""
 
 from datetime import datetime, timezone
 
@@ -43,7 +37,7 @@ class BlueskyPlatform(Platform):
         )
         raise_for_api_error(post_response)
 
-        uri = post_response.json().get("uri")  # at://did:plc:.../app.bsky.feed.post/<rkey>
+        uri = post_response.json().get("uri")
         if not uri:
             raise PlatformError("Post created but no record URI was returned.")
         rkey = uri.rsplit("/", 1)[-1]

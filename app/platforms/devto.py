@@ -1,8 +1,4 @@
-"""DEV Community (dev.to), through the Forem API.
-
-Docs: https://developers.forem.com/api/v1#tag/articles/operation/createArticle
-API key: dev.to -> Settings -> Extensions -> "DEV Community API Keys".
-"""
+"""DEV Community (Forem API). Docs: https://developers.forem.com/api/v1#tag/articles"""
 
 import httpx
 

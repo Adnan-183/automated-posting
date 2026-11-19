@@ -1,8 +1,4 @@
-"""Mastodon (any instance), through the REST API.
-
-Docs: https://docs.joinmastodon.org/methods/statuses/#create
-Token scope needed: `write:statuses`.
-"""
+"""Mastodon statuses. Docs: https://docs.joinmastodon.org/methods/statuses/#create"""
 
 import uuid
 
@@ -21,7 +17,6 @@ class MastodonPlatform(Platform):
             f"{instance}/api/v1/statuses",
             headers={
                 "Authorization": f"Bearer {self.settings.mastodon_access_token}",
-                # Stops a retried request from creating a duplicate status.
                 "Idempotency-Key": str(uuid.uuid4()),
             },
             data={"status": message, "visibility": "public"},

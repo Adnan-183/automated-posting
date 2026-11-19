@@ -7,12 +7,8 @@ from urllib.parse import urlsplit
 MAX_MESSAGE_LENGTH = 200
 MAX_URL_LENGTH = 2048
 
-# Anything that looks like a link: an http(s):// URL or a bare "www." address.
-# Bare "www." links are detected so they count towards the one-link rule,
-# then rejected by `validate_url` because they have no scheme.
 LINK_PATTERN = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
 
-# Punctuation that usually ends a sentence rather than belonging to the URL.
 TRAILING_PUNCTUATION = ".,;:!?)]}'\""
 
 HOSTNAME_LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
@@ -25,10 +21,7 @@ def extract_links(text: str) -> list[str]:
 
 
 def validate_url(url: str) -> str:
-    """Check that `url` is a public, well-formed http(s) URL.
-
-    Returns the URL unchanged, or raises ValueError with a readable reason.
-    """
+    """Raise ValueError unless url is a well-formed public http(s) URL."""
     if len(url) > MAX_URL_LENGTH:
         raise ValueError(f"CTA link is too long (max {MAX_URL_LENGTH} characters).")
 
@@ -37,7 +30,7 @@ def validate_url(url: str) -> str:
         raise ValueError(f"CTA link '{url}' must start with http:// or https://.")
 
     try:
-        parts.port  # raises ValueError for a non-numeric or out-of-range port
+        parts.port
     except ValueError:
         raise ValueError(f"CTA link '{url}' has an invalid port.") from None
 

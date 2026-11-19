@@ -18,16 +18,11 @@ class PublishedPost:
 
 
 class PlatformError(Exception):
-    """A platform rejected the post or returned something unusable.
-
-    The message is shown to API callers, so it must never contain credentials.
-    """
+    """Raised when a platform rejects a post. Never include credentials in the message."""
 
 
 class Platform(ABC):
-    #: Human-readable name used in the API response.
     name: ClassVar[str]
-    #: Settings attributes that must be set for this platform to run.
     required_settings: ClassVar[tuple[str, ...]]
 
     def __init__(self, settings: Settings) -> None:
@@ -47,11 +42,7 @@ class Platform(ABC):
 
 
 def raise_for_api_error(response: httpx.Response) -> None:
-    """Turn a non-2xx response into a PlatformError with the API's own reason.
-
-    The request URL is deliberately left out: some APIs (Telegram) put the
-    token in the URL, and this message is returned to API callers.
-    """
+    """Raise PlatformError for non-2xx responses, without the request URL."""
     if response.is_success:
         return
 
