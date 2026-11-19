@@ -29,7 +29,7 @@ A FastAPI service with one endpoint, `POST /posting`. It takes a short message w
 ## Quick start
 
 ```bash
-git clone <this-repo-url> automated-posting
+git clone https://github.com/Adnan-183/automated-posting.git
 cd automated-posting
 
 python3 -m venv .venv
