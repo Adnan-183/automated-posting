@@ -21,7 +21,7 @@ A FastAPI service with one endpoint, `POST /posting`. It takes a short message w
 7. [Public access check](#public-access-check)
 8. [Error handling](#error-handling)
 9. [Tests](#tests)
-10. [Logs and screenshots](#logs-and-screenshots)
+10. [Logs](#logs)
 11. [Project structure](#project-structure)
 
 ---
@@ -303,25 +303,30 @@ The 36 tests use [respx](https://lundberg.github.io/respx/) to mock every platfo
 
 ---
 
-## Logs and screenshots
+## Logs
 
-Server log from a real run with no `.env` (each platform fails cleanly and the request still returns 200):
+Server log from a live run on 16 Nov 2026 (GitHub token set, the other credentials empty). Five platforms report "Not configured", Rentry fails on a real API error, and GitHub Gist and paste.rs still publish. The request returns 200 with all 8 results:
 
 ```
 INFO:     Uvicorn running on http://0.0.0.0:4000 (Press CTRL+C to quit)
-WARNING posting: Bluesky: failed - Not configured: set BLUESKY_HANDLE, BLUESKY_APP_PASSWORD.
-WARNING posting: Mastodon: failed - Not configured: set MASTODON_INSTANCE_URL, MASTODON_ACCESS_TOKEN.
-WARNING posting: Telegram: failed - Not configured: set TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.
-WARNING posting: GitHub Gist: failed - Not configured: set GITHUB_TOKEN.
+WARNING posting: Bluesky: failed - Not configured: set BLUESKY_APP_PASSWORD.
+WARNING posting: Mastodon: failed - Not configured: set MASTODON_ACCESS_TOKEN.
+WARNING posting: Telegram: failed - Not configured: set TELEGRAM_BOT_TOKEN.
 WARNING posting: DEV Community: failed - Not configured: set DEVTO_API_KEY.
 WARNING posting: Discord: failed - Not configured: set DISCORD_WEBHOOK_URL.
-INFO:     127.0.0.1:50217 - "POST /posting HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50219 - "POST /posting HTTP/1.1" 422 Unprocessable Content
+WARNING posting: Rentry: failed - Rentry status 400: PAGE_TITLE : Length too long, maximum is 60. You submitted 71
+INFO    posting: GitHub Gist: success https://gist.github.com/<user>/bc30af566522d1a1d2ec1e89bb85b1f3
+INFO    posting: paste.rs: success https://paste.rs/kHmcO
+INFO:     127.0.0.1:50782 - "POST /posting HTTP/1.1" 200 OK
 ```
 
-With credentials set, each successful platform logs a line like `INFO posting: paste.rs: success https://paste.rs/kHmcO (public: True)`.
+The Rentry error came from Rentry's 60-character title limit, which this run surfaced. The title is now capped at 60 characters, with a test. The live paste is at https://paste.rs/kHmcO.
 
-Screenshots from a live run are in [`docs/screenshots/`](docs/screenshots/): the Swagger UI, a full response, and the published posts on each platform.
+A validation failure from the same server:
+
+```
+INFO:     127.0.0.1:50219 - "POST /posting HTTP/1.1" 422 Unprocessable Content
+```
 
 ---
 
@@ -351,7 +356,6 @@ automated-posting/
 ├── tests/
 │   ├── conftest.py              # Fixtures: settings overrides, mocked platform APIs
 │   └── test_posting.py
-├── docs/screenshots/
 ├── .env.example
 ├── requirements.txt
 └── README.md
